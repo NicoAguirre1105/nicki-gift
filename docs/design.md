@@ -1,5 +1,9 @@
 # Diseño
 
+## Login
+
+- Solo habrá la opción de login mediante correo y contraseña. No habrá forma de registrar un nuevo usuario desde la página web.
+
 ## Diseño del juego
 
 ### Aspecto visual

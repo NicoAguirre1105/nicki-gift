@@ -42,4 +42,5 @@
 docs/
 ├── design.md     ← diseño, reglas del juego, flujo completo, estados
 ├── map-format.md      ← estructura del JSON de Tiled, qué significa cada capa
+├── supabase.md      ← estructura de supabase y sus tablas
 └── trivia-content.md  ← las 8 preguntas y sus respuestas correctas
