@@ -1,2 +1,128 @@
 @import "tailwindcss";
 
+/* ── Fuentes ─────────────────────────────────────────── */
+:root {
+  --font-bitcount: 'Bitcount Grid Single', monospace;
+
+  /* Paleta dark gris-azulada */
+  --bg-base:      #0d0f1a;
+  --bg-surface:   #151929;
+  --bg-card:      #1c2235;
+  --border-pixel: #2e3a5c;
+  --border-glow:  #4a6fa5;
+  --text-primary: #e8eaf6;
+  --text-muted:   #7b8ab8;
+  --accent:       #6c8ed4;
+  --accent-dark:  #4a6fa5;
+  --error:        #e05c6a;
+  --shadow-pixel: #080a12;
+}
+
+/* ── Reset base ──────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  image-rendering: pixelated;
+  font-family: 'Bitcount Grid Single', monospace;
+}
+
+/* ── Utilidades pixel art ────────────────────────────── */
+
+/* Borde estilo pixel (doble capa de sombra) */
+.pixel-border {
+  border: 2px solid var(--border-pixel);
+  box-shadow:
+    -2px 0 0 0 var(--shadow-pixel),
+     2px 0 0 0 var(--shadow-pixel),
+     0 -2px 0 0 var(--shadow-pixel),
+     0  2px 0 0 var(--shadow-pixel);
+}
+
+.pixel-border-accent {
+  border: 2px solid var(--accent);
+  box-shadow:
+    -2px 0 0 0 var(--shadow-pixel),
+     2px 0 0 0 var(--shadow-pixel),
+     0 -2px 0 0 var(--shadow-pixel),
+     0  2px 0 0 var(--shadow-pixel),
+     0  0  8px 1px var(--accent-dark);
+}
+
+/* Botón pixel — efecto "press" */
+.pixel-btn {
+  font-family: 'Bitcount Grid Single', monospace;
+  font-size: 1rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  background-color: var(--accent-dark);
+  color: var(--text-primary);
+  border: none;
+  padding: 0.6rem 1.4rem;
+  cursor: pointer;
+  position: relative;
+  /* sombra inferior para dar volumen pixel */
+  box-shadow:
+    0  4px 0 0 #2c3e6a,
+    0  6px 0 0 var(--shadow-pixel);
+  transition: box-shadow 60ms, transform 60ms;
+  image-rendering: pixelated;
+}
+
+.pixel-btn:hover {
+  background-color: var(--accent);
+}
+
+.pixel-btn:active,
+.pixel-btn:disabled {
+  box-shadow: none;
+  transform: translateY(4px);
+}
+
+.pixel-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Input pixel art */
+.pixel-input {
+  font-family: 'Bitcount Grid Single', monospace;
+  font-size: 0.9rem;
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  border: 2px solid var(--border-pixel);
+  padding: 0.55rem 0.75rem;
+  outline: none;
+  width: 100%;
+  transition: border-color 120ms;
+}
+
+.pixel-input::placeholder {
+  color: var(--text-muted);
+}
+
+.pixel-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-dark);
+}
+
+/* Scanline overlay decorativo */
+.scanlines::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 3px,
+    rgba(0,0,0,0.08) 3px,
+    rgba(0,0,0,0.08) 4px
+  );
+  pointer-events: none;
+  z-index: 50;
+}

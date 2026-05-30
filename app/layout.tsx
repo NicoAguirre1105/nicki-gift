@@ -1,17 +1,5 @@
 import type { Metadata } from "next";
-import { Jersey_20, Bitcount_Grid_Single } from "next/font/google";
 import "./globals.css";
-
-const jersey20 = Jersey_20({
-  variable: "--font-jersey",
-  subsets: ["latin"],
-  weight: "400",
-});
-
-const bitcount = Bitcount_Grid_Single({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -24,11 +12,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${bitcount.variable} ${jersey20.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col">{children}</body>
+    <html lang="en" className="h-full antialiased">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Bitcount+Grid+Single&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body className="min-h-full flex flex-col" suppressHydrationWarning>
+        {children}
+      </body>
     </html>
   );
 }
