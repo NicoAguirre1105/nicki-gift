@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Jersey_20, Bitcount_Grid_Single } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const jersey20 = Jersey_20({
+  variable: "--font-jersey",
   subsets: ["latin"],
+  weight: "400",
 });
 
-const geistMono = Geist_Mono({
+const bitcount = Bitcount_Grid_Single({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
@@ -25,7 +26,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${bitcount.variable} ${jersey20.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
