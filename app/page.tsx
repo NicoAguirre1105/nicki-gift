@@ -27,17 +27,11 @@ export default function LoginPage() {
       >
         {/* Título */}
         <div className="flex flex-col items-center gap-1">
-          <p
+          <h1
             className="text-xs tracking-widest uppercase"
             style={{ color: 'var(--text-muted)' }}
           >
-            ✦ Login ✦
-          </p>
-          <h1
-            className="text-3xl tracking-wide"
-            style={{ color: 'var(--text-primary)' }}
-          >
-            NxN
+            ✦ NxN ✦
           </h1>
         </div>
 

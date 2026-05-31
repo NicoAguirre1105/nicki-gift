@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
+// proxy.ts no puede usar next/headers — usa req.cookies directamente (correcto)
 
 const protectedRoutes = ['/game', '/dashboard']
 const publicRoutes = ['/']

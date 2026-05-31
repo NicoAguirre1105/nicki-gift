@@ -1,7 +1,7 @@
 'use server'
 
 import { redirect } from 'next/navigation'
-import { createSupabaseServerClient } from '@/app/lib/supabase'
+import { createSupabaseServerClient } from '@/app/lib/supabase-server'
 
 export type LoginState =
   | { error: string }
