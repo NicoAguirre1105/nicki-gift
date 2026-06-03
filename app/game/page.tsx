@@ -1,6 +1,12 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createSupabaseServerClient } from '@/app/lib/supabase-server'
 import GameCanvas from '@/app/_components/game/GameCanvas'
+
+export const metadata: Metadata = {
+  title: 'Regalo de Nicki',
+  robots: { index: false, follow: false },
+}
 
 export default async function GamePage() {
   const supabase = await createSupabaseServerClient()
