@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import NarratorProvider from '@/app/_components/narrator/NarratorProvider'
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -22,7 +23,9 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
-        {children}
+        <NarratorProvider>
+          {children}
+        </NarratorProvider>
       </body>
     </html>
   );

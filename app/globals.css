@@ -111,6 +111,25 @@ html, body {
   box-shadow: 0 0 0 1px var(--accent-dark);
 }
 
+/* Parpadeo para cursor typewriter e indicador de avanzar */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+/* Bounce para el loader de corazones */
+@keyframes heart-bounce {
+  0%, 100% { transform: translateY(0)   scale(1);    }
+  40%      { transform: translateY(-14px) scale(1.15); }
+  60%      { transform: translateY(-6px)  scale(1.05); }
+}
+
+/* Fade-in suave para el login form */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
 /* Scanline overlay decorativo */
 .scanlines::after {
   content: '';
@@ -124,5 +143,5 @@ html, body {
     rgba(0,0,0,0.08) 4px
   );
   pointer-events: none;
-  z-index: 50;
+  z-index: 30;
 }

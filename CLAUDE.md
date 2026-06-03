@@ -29,6 +29,7 @@
 - Mapa JSON en: \public\assets\Free CC0 Top Down Tileset Template Pixel Art by Rgsdev\Free CC0 Top Down Tileset Pixel Art\Tilesets\map.json
 - Frames de personaje en: \public\characters\Nicki 
 - Frames de narrador en: \public\characters\Nico 
+- Canciones de soundtrack en: \public\music
 
 ## Convenciones
 

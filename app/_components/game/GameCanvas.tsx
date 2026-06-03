@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useReducer, useCallback } from 'react'
+import { useEffect, useRef, useReducer, useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   parseMap,
@@ -18,29 +18,30 @@ import {
   TOTAL_TRIVIA,
 } from '@/app/lib/gameState'
 import { createSupabaseBrowserClient } from '@/app/lib/supabase'
+import { useNarrator } from '@/app/hooks/useNarrator'
+import type { NarratorLine } from '@/app/lib/narratorContext'
 import HUD from './HUD'
 import TriviaModal from './TriviaModal'
 import DPad, { Direction } from './DPad'
 
 // ─── Escala y dimensiones ────────────────────────────────────────────────────
-const SCALE        = 3
-const TILE_RENDER  = TILE_SIZE * SCALE   // 48px por tile en pantalla
+const SCALE         = 3
+const TILE_RENDER   = TILE_SIZE * SCALE   // 48px por tile en pantalla
 const VIEWPORT_COLS = 15
 const VIEWPORT_ROWS = 12
-const CANVAS_W     = (VIEWPORT_COLS + 1) * TILE_RENDER
-const CANVAS_H     = (VIEWPORT_ROWS + 1) * TILE_RENDER
+const CANVAS_W      = (VIEWPORT_COLS + 1) * TILE_RENDER
+const CANVAS_H      = (VIEWPORT_ROWS + 1) * TILE_RENDER
 
 // ─── Velocidad de movimiento (px por frame a ~60fps) ─────────────────────────
-const SPEED = 4   // ~90px/s · TILE_RENDER=48px → ~0.53s por tile
+const SPEED = 4
 
 // ─── Hitbox en los pies ───────────────────────────────────────────────────────
-// Rectángulo pequeño centrado en el anchor (posición de los pies del personaje)
-const HB_HALF_W = 10  // px a cada lado horizontalmente
-const HB_HALF_H = 6   // px arriba/abajo
+const HB_HALF_W = 10
+const HB_HALF_H = 6
 
 // ─── Sprite ──────────────────────────────────────────────────────────────────
 const FRAME_COUNT = 4
-const FRAME_MS    = 150   // ms por frame de animación
+const FRAME_MS    = 150
 
 type AnimDir = 'up' | 'down' | 'left' | 'right'
 
@@ -52,11 +53,8 @@ const DIR_FRAMES: Record<AnimDir, string[]> = {
 }
 const IDLE_SRC = '/characters/Nicki/frame_base-removebg-preview.png'
 
-// Altura fija de render del sprite en pantalla (en px canvas)
-// Las imágenes son rectángulos portrait: down/up/base ≈ 185×242, left/right ≈ 157×234
-const SPRITE_H = TILE_RENDER * 2  
+const SPRITE_H = TILE_RENDER * 2
 
-// Anchos calculados por ratio de las imágenes originales
 const SPRITE_W: Record<AnimDir | 'idle', number> = {
   down:  Math.round(SPRITE_H * (185 / 242)),
   up:    Math.round(SPRITE_H * (155 / 239)),
@@ -65,10 +63,8 @@ const SPRITE_W: Record<AnimDir | 'idle', number> = {
   idle:  Math.round(SPRITE_H * (184 / 241)),
 }
 
-// Cooldown de trampa (ms) — evita perder varias vidas seguidas en el mismo tile
 const TRAP_COOLDOWN_MS = 2000
 
-// ─── Mapa de teclas → dirección ───────────────────────────────────────────────
 const KEY_MAP: Record<string, Direction> = {
   ArrowUp: 'up',    w: 'up',    W: 'up',
   ArrowDown: 'down', s: 'down', S: 'down',
@@ -76,7 +72,6 @@ const KEY_MAP: Record<string, Direction> = {
   ArrowRight: 'right', d: 'right', D: 'right',
 }
 
-// ─── Dirección → delta ────────────────────────────────────────────────────────
 const DIR_DELTA: Record<Direction, { dx: number; dy: number }> = {
   up:    { dx: 0,  dy: -1 },
   down:  { dx: 0,  dy:  1 },
@@ -84,8 +79,16 @@ const DIR_DELTA: Record<Direction, { dx: number; dy: number }> = {
   right: { dx: 1,  dy:  0 },
 }
 
+// ─── Tipo para la cola de narrador ───────────────────────────────────────────
+type NarratorRequest = {
+  lines: NarratorLine[]
+  onDone: () => void
+}
+
 export default function GameCanvas() {
-  const router = useRouter()
+  const router   = useRouter()
+  const { say }  = useNarrator()
+
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [state, dispatch] = useReducer(gameReducer, undefined, initialGameState)
 
@@ -98,36 +101,74 @@ export default function GameCanvas() {
   // ── Mapa ──────────────────────────────────────────────────────────────────
   const mapData = useRef(parseMap())
 
-  // ── Estado de movimiento (refs para no bloquear el loop) ──────────────────
-  // Anchor en px (world space) — empieza en el centro del tile inicial
-  const posRef = useRef({
-    x: (PLAYER_START.x + 0.5) * TILE_RENDER,
-    y: (PLAYER_START.y + 0.75) * TILE_RENDER,
-  })
+  // ── Canvas offscreen para el efecto de oscuridad ─────────────────────────
+  const fogCanvas = useRef<HTMLCanvasElement | null>(null)
+
+  // ── Estado de movimiento ──────────────────────────────────────────────────
+  const posRef       = useRef({ x: (PLAYER_START.x + 0.5) * TILE_RENDER, y: (PLAYER_START.y + 0.75) * TILE_RENDER })
   const facingRef    = useRef<AnimDir>('down')
   const frameIdxRef  = useRef(0)
   const lastFrameMs  = useRef(0)
   const rafRef       = useRef(0)
 
-  // Set de teclas actualmente presionadas (fix multi-key)
-  const heldKeys = useRef(new Set<Direction>())
-
-  // Tile bajo los pies en el frame anterior (para detectar entradas a trivia/end/traps)
+  const heldKeys      = useRef(new Set<Direction>())
   const lastFeetTile  = useRef({ x: PLAYER_START.x, y: PLAYER_START.y })
-  const lastTrapHitMs = useRef(0)   // timestamp del último golpe de trampa
+  const lastTrapHitMs = useRef(0)
 
-  // Ref mutable de triviaCollected para acceder desde el loop sin stale closure
+  // ── Pausa del movimiento mientras el narrador está activo ─────────────────
+  const pausedRef = useRef(false)
+
+  // ── Fog of war — se activa al terminar el diálogo intro ──────────────────
+  const fogEnabledRef   = useRef(false)
+  const fogStartTimeRef = useRef(0)         // timestamp cuando se activó el fog
+  const FOG_FADE_MS     = 1500              // duración del fade-in de oscuridad
+
+  // ── Cola del narrador ─────────────────────────────────────────────────────
+  // El loop escribe aquí; el useEffect de abajo lo consume y llama a say()
+  const narratorQueue  = useRef<NarratorRequest | null>(null)
+  const [narratorTick, setNarratorTick] = useState(0)   // incrementar dispara el useEffect
+
+  // ── Refs de estado de React (lectura sin stale closure) ──────────────────
   const triviaCollectedRef = useRef<number[]>([])
   triviaCollectedRef.current = state.triviaCollected
 
-  // Ref mutable de phase
   const phaseRef = useRef(state.phase)
   phaseRef.current = state.phase
+
+  // ── Helper: pausar juego, mostrar narrador, reanudar al cerrar ────────────
+  function showNarrator(lines: NarratorLine[], onDone: () => void) {
+    heldKeys.current.clear()
+    pausedRef.current = true
+    narratorQueue.current = { lines, onDone }
+    setNarratorTick(t => t + 1)
+  }
+
+  // ── Consumir la cola del narrador ─────────────────────────────────────────
+  useEffect(() => {
+    if (!narratorQueue.current) return
+    const { lines, onDone } = narratorQueue.current
+    narratorQueue.current = null
+
+    say(lines).then(() => {
+      heldKeys.current.clear()
+      pausedRef.current = false
+      onDone()
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [narratorTick])
+
+  // ── Inicializar fog canvas (offscreen) ───────────────────────────────────
+  useEffect(() => {
+    const c = document.createElement('canvas')
+    c.width  = CANVAS_W
+    c.height = CANVAS_H
+    fogCanvas.current = c
+  }, [])
 
   // ── Carga de assets ───────────────────────────────────────────────────────
   useEffect(() => {
     let loaded = 0
-    const total = 1 + 1 + (4 * FRAME_COUNT)   // tileset + idle + 4dirs*4frames
+    const total = 1 + 1 + (4 * FRAME_COUNT)
 
     function onLoad() {
       loaded++
@@ -150,22 +191,36 @@ export default function GameCanvas() {
   // ── Diálogos de introducción ──────────────────────────────────────────────
   useEffect(() => {
     if (state.phase !== 'intro') return
-    const msgs = [
-      '¡Bienvenida, Nicki! 🗺️\nEste es el laberinto que preparé para ti.',
-      'Usa las teclas de dirección (o el D-Pad en móvil) para moverte.',
-      'Encuentra las 10 llaves doradas repartidas por el mapa.\nCada una tiene una pregunta especial.',
-      '¡Buena suerte! Te espero al final del laberinto. 💙',
-    ]
-    let i = 0
-    function next() {
-      if (i < msgs.length) { alert(msgs[i++]); next() }
-      else dispatch({ type: 'SET_PHASE', phase: 'playing' })
-    }
-    const t = setTimeout(next, 300)
+
+    const t = setTimeout(() => {
+      showNarrator([
+        { text: 'Bueno, te puse la skin de mi noviecita hermosa. 💙', image: 'guide_base.png' },
+        { text: 'Eeeeeeepa, pero te has robado ciertos items de una amiga...', image: 'guide_suspect.png', side: 'right' },
+        { text: 'Parece que sí eres la real... Veamos.', image: 'guide_writing.png' },
+        { text: 'La real Nicki hermosa le sabe a los videojuegos.', image: 'guide_complete.png', side: 'right' },
+        { text: 'Acabo de preparar un laberinto para ver si le sabes o no.', image: 'guide_confident2.png' },
+        { text: 'Tienes que juntar 10 llaves y llegar al final del laberinto.', image: 'guide_advertising.png', side: 'right' },
+        { text: 'Pero eso sería muy fácil, así que...', image: 'guide_finger.png' },
+      ], () => {
+        // Activar fog of war al terminar el diálogo intro
+        fogEnabledRef.current   = true
+        fogStartTimeRef.current = performance.now()
+
+        // Esperar a que el fog termine de aparecer + 1.5s extra, luego mostrar ghost
+        setTimeout(() => {
+          showNarrator([
+            { text: 'Ahora sí veamos quién eres en realidad.', image: 'guide_ghost.png', side: 'right' },
+          ], () => {
+            dispatch({ type: 'SET_PHASE', phase: 'playing' })
+          })
+        }, FOG_FADE_MS + 1500)
+      })
+    }, 2500)
     return () => clearTimeout(t)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.phase])
 
-  // ── Teclado: usa un Set para manejar múltiples teclas simultáneas ─────────
+  // ── Teclado ───────────────────────────────────────────────────────────────
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       const dir = KEY_MAP[e.key]
@@ -188,17 +243,20 @@ export default function GameCanvas() {
   // ── Fin del laberinto ─────────────────────────────────────────────────────
   useEffect(() => {
     if (state.phase !== 'end') return
-    alert('¡Lo lograste! Has completado el laberinto. 🎉\nAhora te espera algo especial...')
-    async function finish() {
+
+    showNarrator([
+      { text: '¡Lo lograste, Nicki! 🎉  Has completado el laberinto.', image: 'guide_complete.png' },
+      { text: 'Ahora te espera algo especial... 💙', image: 'guide_gift.png', side: 'right' },
+    ], async () => {
       const supabase = createSupabaseBrowserClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (user) await supabase.from('profiles').update({ maze_completed: true }).eq('id', user.id)
       router.push('/dashboard')
-    }
-    finish()
-  }, [state.phase, router])
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.phase])
 
-  // ── Colisión con hitbox ───────────────────────────────────────────────────
+  // ── Colisión con paredes ──────────────────────────────────────────────────
   function wouldCollide(nx: number, ny: number): boolean {
     const corners = [
       { x: nx - HB_HALF_W, y: ny - HB_HALF_H },
@@ -225,25 +283,23 @@ export default function GameCanvas() {
 
       if (!assetsOk.current) return
       const phase = phaseRef.current
-      if (phase === 'intro' || phase === 'end') return
+      if (phase === 'end') return
 
-      const held = heldKeys.current
+      const held    = heldKeys.current
+      const paused  = pausedRef.current || phase === 'intro'
 
-      // ── Calcular movimiento ─────────────────────────────────────────────
+      // ── Calcular movimiento (solo si no está pausado) ───────────────────
       let isMoving = false
 
-      if (phase === 'playing' && held.size > 0) {
-        // Prioridad: las dos primeras teclas del Set (orden de inserción)
+      if (!paused && phase === 'playing' && held.size > 0) {
         const activeDirs = [...held].slice(0, 2) as Direction[]
 
-        // Intentar mover en X e Y por separado (permite deslizarse en paredes)
         let dx = 0, dy = 0
         activeDirs.forEach(dir => {
           dx += DIR_DELTA[dir].dx
           dy += DIR_DELTA[dir].dy
         })
 
-        // Normalizar para que la velocidad sea constante en diagonal
         const len = Math.sqrt(dx * dx + dy * dy) || 1
         const vx = (dx / len) * SPEED
         const vy = (dy / len) * SPEED
@@ -252,7 +308,6 @@ export default function GameCanvas() {
         const nx = cur.x + vx
         const ny = cur.y + vy
 
-        // Movimiento separado en X e Y para deslizamiento suave en paredes
         const canX = !wouldCollide(nx, cur.y)
         const canY = !wouldCollide(cur.x, ny)
 
@@ -261,9 +316,7 @@ export default function GameCanvas() {
 
         isMoving = canX || canY
 
-        // Actualizar facing según la dirección dominante
         if (isMoving) {
-          // Preferir la dirección con mayor componente de movimiento
           const dominantDir = activeDirs.reduce<Direction>((best, dir) => {
             const db = Math.abs(DIR_DELTA[best].dx) + Math.abs(DIR_DELTA[best].dy)
             const dc = Math.abs(DIR_DELTA[dir].dx) + Math.abs(DIR_DELTA[dir].dy)
@@ -280,16 +333,15 @@ export default function GameCanvas() {
           frameIdxRef.current = (frameIdxRef.current + 1) % FRAME_COUNT
         }
       } else {
-        // Parado → frame_base
         frameIdxRef.current = 0
       }
 
-      // ── Detectar tile bajo los pies ─────────────────────────────────────
+      // ── Detectar tile bajo los pies (solo si no está pausado) ───────────
       const { x: px, y: py } = posRef.current
       const feetTileX = Math.floor(px / TILE_RENDER)
       const feetTileY = Math.floor(py / TILE_RENDER)
 
-      if (phase === 'playing') {
+      if (!paused && phase === 'playing') {
         const prev = lastFeetTile.current
         const tileChanged = feetTileX !== prev.x || feetTileY !== prev.y
 
@@ -309,22 +361,21 @@ export default function GameCanvas() {
           if (ep && ep.x === feetTileX && ep.y === feetTileY) {
             const missing = TOTAL_TRIVIA - triviaCollectedRef.current.length
             if (missing > 0) {
-              // Limpiar ANTES del alert (el alert bloquea y puede disparar keyup/keydown)
-              heldKeys.current.clear()
-              alert(`Aún faltan ${missing} llave${missing > 1 ? 's' : ''} por encontrar.`)
-              // Limpiar TAMBIÉN después: el usuario pudo haber pulsado teclas al cerrar el alert
-              heldKeys.current.clear()
+              showNarrator([
+                {
+                  text: `Aún faltan ${missing} llave${missing > 1 ? 's' : ''} por encontrar. ¡Sigue buscando! 🗝️`,
+                  image: 'guide_critic.png',
+                },
+              ], () => { /* solo reanudar movimiento */ })
             } else {
               heldKeys.current.clear()
-              // Actualizar phaseRef sincrónicamente para que el loop se detenga
-              // en el mismo frame, sin esperar el re-render de React
               phaseRef.current = 'end'
               dispatch({ type: 'SET_PHASE', phase: 'end' })
             }
           }
         }
 
-        // ¿Trampa? — se revisan las 4 esquinas del hitbox: con 1-2 px de contacto ya activa
+        // ¿Trampa?
         const isTrap = [
           { x: px - HB_HALF_W, y: py - HB_HALF_H },
           { x: px + HB_HALF_W, y: py - HB_HALF_H },
@@ -336,23 +387,22 @@ export default function GameCanvas() {
           if (tx < 0 || ty < 0 || tx >= MAP_COLS || ty >= MAP_ROWS) return false
           return mapData.current.traps[ty * MAP_COLS + tx] !== 0
         })
+
         if (isTrap && now - lastTrapHitMs.current > TRAP_COOLDOWN_MS) {
           lastTrapHitMs.current = now
-          heldKeys.current.clear()
           dispatch({ type: 'LOSE_LIFE' })
-          alert('¡Una trampa! Perdiste una vida. 💔')
-          heldKeys.current.clear()
+          showNarrator([
+            { text: '¡Ups! Caíste en una trampa. 💔  Ten más cuidado por donde caminas.', image: 'guide_deception.png' },
+          ], () => { /* solo reanudar movimiento */ })
         }
       }
 
-      // ── Cámara en píxeles continuos (smooth) ───────────────────────────
-      // Centro de la cámara = posición del jugador, clampeado a los límites del mapa
+      // ── Cámara ──────────────────────────────────────────────────────────
       const MAP_PX_W = MAP_COLS * TILE_RENDER
       const MAP_PX_H = MAP_ROWS * TILE_RENDER
       const camPxX = Math.max(0, Math.min(px - CANVAS_W / 2, MAP_PX_W - CANVAS_W))
       const camPxY = Math.max(0, Math.min(py - CANVAS_H / 2, MAP_PX_H - CANVAS_H))
 
-      // Rango de tiles a dibujar (un tile extra en cada borde para cubrir el desplazamiento)
       const startTX = Math.floor(camPxX / TILE_RENDER)
       const startTY = Math.floor(camPxY / TILE_RENDER)
       const endTX   = Math.min(startTX + VIEWPORT_COLS + 2, MAP_COLS)
@@ -360,8 +410,6 @@ export default function GameCanvas() {
 
       // ── Render ──────────────────────────────────────────────────────────
       ctx.clearRect(0, 0, CANVAS_W, CANVAS_H)
-
-      // Trasladar el contexto para que (0,0) quede en la esquina superior-izquierda del mundo
       ctx.save()
       ctx.translate(-camPxX, -camPxY)
 
@@ -381,19 +429,11 @@ export default function GameCanvas() {
             ctx.drawImage(ts, sx, sy, TILE_SIZE, TILE_SIZE, worldX, worldY, TILE_RENDER, TILE_RENDER)
           }
 
-          // Floor
           drawTile(floor[idx])
-
-          // Walls
           drawTile(wallsLayer[idx])
-
-          // Traps
           drawTile(traps[idx])
-
-          // End / goal
           drawTile(endLayer[idx])
 
-          // Trivia (solo si no recogida)
           const tp = mapData.current.triviaPoints.find(p => p.x === tx && p.y === ty)
           if (!tp || !collected.includes(tp.index)) {
             drawTile(trivia[idx])
@@ -401,7 +441,7 @@ export default function GameCanvas() {
         }
       }
 
-      // Personaje — dibujado en espacio mundo (mismo sistema de coordenadas que el mapa)
+      // Personaje
       let img: HTMLImageElement | null = null
       let spriteW: number
       if (!isMoving) {
@@ -414,16 +454,50 @@ export default function GameCanvas() {
       }
 
       if (img) {
-        ctx.drawImage(
-          img,
-          px - spriteW / 2,  // centrado en X sobre el anchor
-          py - SPRITE_H,     // pies = bottom del sprite = anchor Y
-          spriteW,
-          SPRITE_H
-        )
+        ctx.drawImage(img, px - spriteW / 2, py - SPRITE_H, spriteW, SPRITE_H)
       }
 
       ctx.restore()
+
+      // ── Efecto de oscuridad (fog of war) ────────────────────────────────
+      const fog = fogCanvas.current
+      if (fog && fogEnabledRef.current) {
+        const fctx = fog.getContext('2d')!
+
+        // Opacidad del fog: fade-in suave desde 0 → 1 en FOG_FADE_MS
+        const elapsed  = now - fogStartTimeRef.current
+        const fogAlpha = Math.min(elapsed / FOG_FADE_MS, 1)
+
+        // Posición del jugador en espacio de pantalla
+        const screenX = px - camPxX
+        const screenY = py - camPxY - SPRITE_H * 0.4
+
+        const VISION_R    = TILE_RENDER * 3.5
+        const VISION_SOFT = TILE_RENDER * 1.2
+
+        // 1. Rellenar de negro
+        fctx.clearRect(0, 0, CANVAS_W, CANVAS_H)
+        fctx.fillStyle = '#000'
+        fctx.fillRect(0, 0, CANVAS_W, CANVAS_H)
+
+        // 2. Perforar círculo suave con destination-out
+        const grad = fctx.createRadialGradient(
+          screenX, screenY, VISION_R - VISION_SOFT,
+          screenX, screenY, VISION_R
+        )
+        grad.addColorStop(0, 'rgba(0,0,0,1)')
+        grad.addColorStop(1, 'rgba(0,0,0,0)')
+
+        fctx.globalCompositeOperation = 'destination-out'
+        fctx.fillStyle = grad
+        fctx.fillRect(0, 0, CANVAS_W, CANVAS_H)
+        fctx.globalCompositeOperation = 'source-over'
+
+        // 3. Dibujar fog sobre el canvas con la opacidad animada
+        ctx.globalAlpha = fogAlpha
+        ctx.drawImage(fog, 0, 0)
+        ctx.globalAlpha = 1
+      }
     }
 
     rafRef.current = requestAnimationFrame(loop)

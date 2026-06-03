@@ -1,17 +1,17 @@
 'use server'
 
-import { redirect } from 'next/navigation'
 import { createSupabaseServerClient } from '@/app/lib/supabase-server'
 
 export type LoginState =
   | { error: string }
+  | { success: true; destination: '/game' | '/dashboard' }
   | undefined
 
 export async function loginAction(
   _prevState: LoginState,
   formData: FormData
 ): Promise<LoginState> {
-  const email = formData.get('email') as string
+  const email    = formData.get('email')    as string
   const password = formData.get('password') as string
 
   if (!email || !password) {
@@ -26,10 +26,7 @@ export async function loginAction(
     return { error: 'Correo o contraseña incorrectos.' }
   }
 
-  // Leer perfil para saber si ya completó el laberinto
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -37,9 +34,6 @@ export async function loginAction(
     .eq('id', user!.id)
     .single()
 
-  if (profile?.maze_completed) {
-    redirect('/dashboard')
-  } else {
-    redirect('/game')
-  }
+  // Devolver éxito — el redirect lo hace el cliente después del narrador + portal
+  return { success: true, destination: profile?.maze_completed ? '/dashboard' : '/game' }
 }
