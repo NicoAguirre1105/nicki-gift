@@ -23,6 +23,9 @@ import type { NarratorLine } from '@/app/lib/narratorContext'
 import HUD from './HUD'
 import TriviaModal from './TriviaModal'
 import DPad, { Direction } from './DPad'
+import { useMusicPlayer } from '@/app/hooks/useMusicPlayer'
+import WinCelebration from './WinCelebration'
+import PortalTransition from '@/app/_components/login/PortalTransition'
 
 // ─── Escala y dimensiones ────────────────────────────────────────────────────
 const SCALE         = 3
@@ -113,7 +116,8 @@ export default function GameCanvas() {
 
   const heldKeys      = useRef(new Set<Direction>())
   const lastFeetTile  = useRef({ x: PLAYER_START.x, y: PLAYER_START.y })
-  const lastTrapHitMs = useRef(0)
+  const lastTrapHitMs  = useRef(0)
+  const firstTrapRef   = useRef(true)   // true = todavía no ha caído en ninguna trampa
 
   // ── Pausa del movimiento mientras el narrador está activo ─────────────────
   const pausedRef = useRef(false)
@@ -134,6 +138,9 @@ export default function GameCanvas() {
 
   const phaseRef = useRef(state.phase)
   phaseRef.current = state.phase
+
+  // ── Música ────────────────────────────────────────────────────────────────
+  const music = useMusicPlayer()
 
   // ── Helper: pausar juego, mostrar narrador, reanudar al cerrar ────────────
   function showNarrator(lines: NarratorLine[], onDone: () => void) {
@@ -220,6 +227,141 @@ export default function GameCanvas() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.phase])
 
+  // ── Sub-fases de victoria ─────────────────────────────────────────────────
+  type WinPhase = 'none' | 'celebrate' | 'narrate2' | 'portal'
+  const [winPhase, setWinPhase] = useState<WinPhase>('none')
+
+  // ── Guard: la secuencia musical solo arranca una vez ─────────────────────
+  const musicStartedRef = useRef(false)
+
+  // ── Música: 5s después de entrar en 'playing', narrador + fade-in ────────
+  useEffect(() => {
+    if (state.phase !== 'playing') return
+    if (musicStartedRef.current) return   // ← evita re-trigger por trivia/trampa
+    musicStartedRef.current = true
+
+    const t = setTimeout(() => {
+      showNarrator([
+        { text: 'Bueno como que está apagado el ambiente...', image: 'guide_bored.png' },
+        { text: 'Ambientemos un poco el juego. Nicki lo valoraría.', image: 'guide_dj.png', side: 'right' },
+      ], () => {
+        // play(0): fade-out + onNearEnd 2s antes del final de estrella_fugaz
+        music.play(0, () => {
+          showNarrator([
+            { text: '♩ ♫ ♬ ♪ ♩ ♫ ♬', image: 'guide_guitar.png' },
+            { text: '¡Qué linda canción!!!', image: 'guide_happy.png', side: 'right' },
+            { text: 'Pondré otra.', image: 'guide_guitar.png' },
+          ], () => {
+            music.play(1, () => {
+              // 1.5s antes del final de medialuna
+              showNarrator([
+                { text: '♩ ♫ ♬ ♪ ♩ ♫ ♬', image: 'guide_whistle.png' },
+                { text: 'AAAAAA!!!! ¡Qué lindooooooo! Cómo extraño a mi medialuna...', image: 'guide_sad.png', side: 'right' },
+                { text: '¡Cierto! Aún no sé si eres tú.', image: 'guide_critic.png' },
+                { text: 'Sigamos, sigamos.', image: 'guide_suspect.png', side: 'right' },
+              ], () => {
+                music.play(4, () => {
+                  // 2.5s antes del final de seguro_te_pierdo
+                  showNarrator([
+                    { text: 'Seguroooooooo te pierdoooo...', image: 'guide_shower.png' },
+                    { text: 'AHHHHHHHHHH!!!!!....', image: 'guide_shower_surprised.png', side: 'right' },
+                    { text: 'Sori, se me fue el tiempo en la canción.', image: 'guide_towel.png' },
+                    { text: 'Uste siga nomás en lo suyo.', image: 'guide_towel.png', side: 'right' },
+                  ], () => {
+                    music.play(2, () => {
+                      // 2s antes del final de primeras_veces
+                      showNarrator([
+                        { text: 'Aunque las primera veceeeees...', image: 'guide_sing.png' },
+                        { text: 'Qué hermoso recordar a mi reina preciosa.', image: 'guide_tears.png', side: 'right' },
+                        { text: 'Te cuento que cada día estoy más cerca de volver a verla.', image: 'guide_happy.png' },
+                        { text: '¡Qué hago contando esto?!', image: 'guide_critic.png', side: 'right' },
+                        { text: 'Sigamos, sigamos nomás.', image: 'guide_indifferent.png' },
+                      ], () => {
+                        // ── volare (5) ──────────────────────────────────────
+                        music.play(5, () => {
+                          // 3s antes del final de volare
+                          showNarrator([
+                            { text: 'Ohhh ohhh...', image: 'guide_opera.png' },
+                            { text: 'Ayyy mi principessa qué falta me hace.', image: 'guide_tears.png', side: 'right' },
+                            { text: 'Hace poco escuché la siguiente canción y dije: es mi Nicki preciosa.', image: 'guide_base.png' },
+                          ], () => {
+                            // ── bruno (6) ──────────────────────────────────
+                            music.play(6, () => {
+                              // 2s antes del final de bruno
+                              showNarrator([
+                                { text: 'Ehh ehh...', image: 'guide_sing.png' },
+                                { text: 'Mi reina hermosa es eso y mucho más.', image: 'guide_happy.png', side: 'right' },
+                                { text: 'Escuchemos algo más movido.', image: 'guide_base.png' },
+                              ], () => {
+                                // ── mix_chelero (3) ────────────────────────
+                                music.play(3, () => {
+                                  // 3s antes del final de mix_chelero
+                                  showNarrator([
+                                    { text: 'Uyyyy, ¡oiga que fuefff?! Mucho se demora.', image: 'guide_critic.png' },
+                                    { text: 'Quizá la Nicki bella está bailando en vez de jugar. Ya voy a hacer silencio nomás. Te espero al final.', image: 'guide_time.png', side: 'right' },
+                                  ], () => { /* fin de secuencia */ })
+                                }, 3)
+                                // 4s desde inicio de mix_chelero — auto-cierra en 10s
+                                setTimeout(() => {
+                                  showNarrator([
+                                    { text: 'SIEMPRE CONTIGO, SIEMPRE CONTIGO.... ¡LA BELLA LUZ!!!', image: 'guide_sing.png', autoCloseMs: 10000 },
+                                  ], () => { /* reanudar */ })
+                                }, 4000)
+                                // 17s desde inicio de mix_chelero — sprite bailando
+                                setTimeout(() => {
+                                  showNarrator([
+                                    {
+                                      text: '¡Chelas arriba, chelas arriba!',
+                                      image: 'guide_dancing.png',
+                                      frames: ['guide_dancing.png', 'guide_dancing2.png'],
+                                    },
+                                  ], () => { /* reanudar */ })
+                                }, 17000)
+                              })
+                            }, 2)
+                          })
+                        }, 3)
+                        // 9s desde inicio de volare
+                        setTimeout(() => {
+                          showNarrator([
+                            { text: 'Te mando un beso elástico...', image: 'guide_kiss.png' },
+                          ], () => { /* solo reanudar */ })
+                        }, 9000)
+                      })
+                    }, 2)
+                  })
+                }, 2.5)
+              })
+            }, 1.5)
+          })
+        }, 2)
+      })
+    }, 5000)
+
+    return () => clearTimeout(t)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.phase])
+
+  // ── Sin vidas: narrador + reinicio al punto inicial ──────────────────────
+  useEffect(() => {
+    if (state.lives > 0) return
+    if (state.phase !== 'playing' && state.phase !== 'trivia') return
+
+    showNarrator([
+      { text: '...Se acabaron las vidas. 💔', image: 'guide_deception.png' },
+      { text: 'Volvemos al inicio, pero no te preocupes, la música sigue.', image: 'guide_computer_closing.png', side: 'right' },
+    ], () => {
+      // Resetear refs de posición
+      posRef.current       = { x: (PLAYER_START.x + 0.5) * TILE_RENDER, y: (PLAYER_START.y + 0.75) * TILE_RENDER }
+      lastFeetTile.current = { x: PLAYER_START.x, y: PLAYER_START.y }
+      lastTrapHitMs.current = 0
+      heldKeys.current.clear()
+      // Resetear estado del juego (vidas + llaves, fase queda 'playing')
+      dispatch({ type: 'RESET_PLAYER' })
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.lives])
+
   // ── Teclado ───────────────────────────────────────────────────────────────
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -244,17 +386,40 @@ export default function GameCanvas() {
   useEffect(() => {
     if (state.phase !== 'end') return
 
+    // Fade-out de la música del laberinto
+    music.stop()
+
+    // Narrador 1: celebración inicial (4 líneas)
     showNarrator([
-      { text: '¡Lo lograste, Nicki! 🎉  Has completado el laberinto.', image: 'guide_complete.png' },
-      { text: 'Ahora te espera algo especial... 💙', image: 'guide_gift.png', side: 'right' },
-    ], async () => {
+      { text: '¡Yeeeeeeeee!!!', image: 'guide_party.png' },
+      { text: '¡Ahora sí. Bienvenida mi Nicki hermosa!', image: 'guide_welcome.png', side: 'right' },
+      { text: 'Aunque siempre supe que eras tú jeje.', image: 'guide_confident.png' },
+      { text: 'Te entregaré tu regalito de cumpleaños.', image: 'guide_gift.png', side: 'right' },
+    ], () => {
+      // Guardar progreso en Supabase
       const supabase = createSupabaseBrowserClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) await supabase.from('profiles').update({ maze_completed: true }).eq('id', user.id)
-      router.push('/dashboard')
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (user) supabase.from('profiles').update({ maze_completed: true }).eq('id', user.id)
+      })
+      // Iniciar my_you y mostrar celebración
+      music.play(7)
+      setWinPhase('celebrate')
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.phase])
+
+  // ── Al continuar desde la celebración → narrador 2 ───────────────────────
+  const handleCelebrationContinue = useCallback(() => {
+    setWinPhase('narrate2')
+    showNarrator([
+      { text: 'Y también tiene esto...', image: 'guide_letter.png' },
+      { text: 'Pero esto podrás verlo en un ratito, en tu nuevo espacio favorito.', image: 'guide_happy.png', side: 'right' },
+      { text: 'Este espacio es para ti, con mucho cariño y con muchas actualizaciones futuras. Pasa...', image: 'guide_pass.png' },
+    ], () => {
+      setWinPhase('portal')
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // ── Colisión con paredes ──────────────────────────────────────────────────
   function wouldCollide(nx: number, ny: number): boolean {
@@ -363,8 +528,13 @@ export default function GameCanvas() {
             if (missing > 0) {
               showNarrator([
                 {
-                  text: `Aún faltan ${missing} llave${missing > 1 ? 's' : ''} por encontrar. ¡Sigue buscando! 🗝️`,
-                  image: 'guide_critic.png',
+                  text: `Aún te faltan ${missing} llave${missing > 1 ? 's' : ''}.`,
+                  image: 'guide_advertising.png',
+                },
+                {
+                  text: 'Vaya vaya y robe las que le faltan.',
+                  image: 'guide_confident2.png',
+                  side: 'right',
                 },
               ], () => { /* solo reanudar movimiento */ })
             } else {
@@ -389,11 +559,28 @@ export default function GameCanvas() {
         })
 
         if (isTrap && now - lastTrapHitMs.current > TRAP_COOLDOWN_MS) {
-          lastTrapHitMs.current = now
           dispatch({ type: 'LOSE_LIFE' })
-          showNarrator([
-            { text: '¡Ups! Caíste en una trampa. 💔  Ten más cuidado por donde caminas.', image: 'guide_deception.png' },
-          ], () => { /* solo reanudar movimiento */ })
+
+          if (firstTrapRef.current) {
+            // Primera vez en una trampa
+            firstTrapRef.current = false
+            showNarrator([
+              { text: 'Uy... se me olvidó decirte.', image: 'guide_happy.png' },
+              { text: 'Aunque ya deberías saberlo.', image: 'guide_critic.png', side: 'right' },
+              { text: '¡Nicki no sabe nadar. Ten cuidado con el agua!', image: 'guide_advertising.png' },
+            ], () => {
+              lastTrapHitMs.current = performance.now()
+            })
+          } else {
+            // Trampas siguientes
+            showNarrator([
+              { text: '¡Quesffff!!!', image: 'guide_angry.png' },
+              { text: 'Nicki sí le sabe a mover las flechitas.', image: 'guide_suspect.png', side: 'right' },
+              { text: '.........', image: 'guide_writing.png' },
+            ], () => {
+              lastTrapHitMs.current = performance.now()
+            })
+          }
         }
       }
 
@@ -512,6 +699,33 @@ export default function GameCanvas() {
   const isTouchDevice = typeof window !== 'undefined'
     && window.matchMedia('(pointer: coarse)').matches
 
+  // Cuando hay secuencia de victoria, fondo del login en vez del canvas
+  if (winPhase !== 'none') {
+    return (
+      <div
+        className="scanlines"
+        style={{
+          position: 'fixed', inset: 0,
+          backgroundColor: 'var(--bg-base)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}
+      >
+        {/* Esquinas decorativas */}
+        <span className="fixed top-3 left-3 text-xs select-none" style={{ color: 'var(--border-pixel)' }}>╔══</span>
+        <span className="fixed top-3 right-3 text-xs select-none" style={{ color: 'var(--border-pixel)' }}>══╗</span>
+        <span className="fixed bottom-3 left-3 text-xs select-none" style={{ color: 'var(--border-pixel)' }}>╚══</span>
+        <span className="fixed bottom-3 right-3 text-xs select-none" style={{ color: 'var(--border-pixel)' }}>══╝</span>
+
+        {winPhase === 'celebrate' && (
+          <WinCelebration onContinue={handleCelebrationContinue} />
+        )}
+        {winPhase === 'portal' && (
+          <PortalTransition onEntered={() => router.push('/dashboard')} />
+        )}
+      </div>
+    )
+  }
+
   return (
     <div
       className="relative overflow-hidden"
@@ -530,6 +744,13 @@ export default function GameCanvas() {
         <TriviaModal
           point={state.activeTriviaPoint}
           onCollect={(index) => dispatch({ type: 'COLLECT_TRIVIA', index })}
+          onWrongAnswer={() => {
+            dispatch({ type: 'LOSE_LIFE' })
+            showNarrator([
+              { text: 'Mmmmmmmm....', image: 'guide_suspect.png' },
+              { text: '.........', image: 'guide_writing.png', side: 'right' },
+            ], () => { /* reanudar — el modal de trivia sigue abierto */ })
+          }}
           onClose={() => dispatch({ type: 'CLOSE_TRIVIA' })}
         />
       )}
@@ -537,6 +758,7 @@ export default function GameCanvas() {
       {isTouchDevice && state.phase === 'playing' && (
         <DPad onDirectionStart={onDirStart} onDirectionEnd={onDirEnd} />
       )}
+
     </div>
   )
 }

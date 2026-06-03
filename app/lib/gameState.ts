@@ -26,6 +26,7 @@ export type GameAction =
   | { type: 'COLLECT_TRIVIA'; index: number }
   | { type: 'CLOSE_TRIVIA' }
   | { type: 'LOSE_LIFE' }
+  | { type: 'RESET_PLAYER' }   // reinicia posición + llaves + vidas, fase queda 'playing'
 
 export function initialGameState(): GameState {
   return {
@@ -64,6 +65,16 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const newLives = state.lives - 1
       return { ...state, lives: newLives }
     }
+
+    case 'RESET_PLAYER':
+      return {
+        ...state,
+        phase: 'playing',
+        lives: MAX_LIVES,
+        activeTriviaPoint: null,
+        playerTile: { ...PLAYER_START },
+        playerPixel: { x: PLAYER_START.x * 16, y: PLAYER_START.y * 16 },
+      }
 
     default:
       return state

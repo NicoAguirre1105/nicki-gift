@@ -7,10 +7,11 @@ import { TilePoint } from '@/app/lib/map'
 type TriviaModalProps = {
   point: TilePoint
   onCollect: (index: number) => void
+  onWrongAnswer: () => void
   onClose: () => void
 }
 
-export default function TriviaModal({ point, onCollect, onClose }: TriviaModalProps) {
+export default function TriviaModal({ point, onCollect, onWrongAnswer, onClose }: TriviaModalProps) {
   const question = TRIVIA_QUESTIONS[point.index]
   const [selected, setSelected] = useState<number | null>(null)
   const [answered, setAnswered] = useState(false)
@@ -27,6 +28,8 @@ export default function TriviaModal({ point, onCollect, onClose }: TriviaModalPr
 
     if (optionIndex === question.correctIndex) {
       setTimeout(() => onCollect(point.index), 900)
+    } else {
+      onWrongAnswer()
     }
   }
 
@@ -73,11 +76,13 @@ export default function TriviaModal({ point, onCollect, onClose }: TriviaModalPr
             let bgColor     = 'transparent'
 
             if (answered) {
-              if (i === question.correctIndex) {
+              if (i === selected && isCorrect) {
+                // Solo marcar verde si es la respuesta correcta seleccionada
                 borderColor = '#4caf7d'
                 textColor   = '#4caf7d'
                 bgColor     = 'rgba(76,175,125,0.08)'
-              } else if (i === selected) {
+              } else if (i === selected && isWrong) {
+                // Marcar rojo solo la opción elegida, sin revelar la correcta
                 borderColor = 'var(--error)'
                 textColor   = 'var(--error)'
                 bgColor     = 'rgba(224,92,106,0.08)'

@@ -9,15 +9,38 @@ type Props = {
   onDone: () => void
 }
 
-const TYPEWRITER_MS = 28  // ms por carácter
+const TYPEWRITER_MS  = 28   // ms por carácter
+const FRAME_ANIM_MS  = 400  // ms por frame en sprites animados
 
 export default function Narrator({ lines, onDone }: Props) {
   const [lineIdx, setLineIdx]     = useState(0)
   const [displayed, setDisplayed] = useState('')
   const [done, setDone]           = useState(false)   // typewriter terminó
-  const intervalRef               = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [frameIdx, setFrameIdx]   = useState(0)       // frame activo para sprites animados
+
+  const intervalRef    = useRef<ReturnType<typeof setInterval> | null>(null)
+  const autoCloseRef   = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const frameAnimRef   = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const current = lines[lineIdx]
+
+  // Guard: si current aún no existe (render transitorio antes de onDone), no pintar nada
+  if (!current) return null
+
+  // ── Imagen activa (frame animado o imagen estática) ───────────────────────
+  const activeImage = current.frames
+    ? current.frames[frameIdx % current.frames.length]
+    : current.image
+
+  // ── Animación de frames ───────────────────────────────────────────────────
+  useEffect(() => {
+    if (!current.frames || current.frames.length < 2) return
+    setFrameIdx(0)
+    frameAnimRef.current = setInterval(() => {
+      setFrameIdx(i => i + 1)
+    }, FRAME_ANIM_MS)
+    return () => clearInterval(frameAnimRef.current!)
+  }, [lineIdx, current.frames])
 
   // ── Typewriter ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -37,11 +60,25 @@ export default function Narrator({ lines, onDone }: Props) {
     return () => clearInterval(intervalRef.current!)
   }, [lineIdx, current.text])
 
+  // ── Auto-cierre: empieza cuando el typewriter termina ────────────────────
+  useEffect(() => {
+    if (!done || !current.autoCloseMs) return
+
+    autoCloseRef.current = setTimeout(() => {
+      advance()
+    }, current.autoCloseMs)
+
+    return () => clearTimeout(autoCloseRef.current!)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [done, lineIdx])
+
   // ── Avanzar con Espacio ───────────────────────────────────────────────────
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.code !== 'Space') return
       e.preventDefault()
+      // Si hay auto-cierre pendiente, cancelarlo al avanzar manualmente
+      clearTimeout(autoCloseRef.current!)
       advance()
     }
     window.addEventListener('keydown', onKey)
@@ -49,14 +86,12 @@ export default function Narrator({ lines, onDone }: Props) {
   })
 
   function advance() {
-    // Si el typewriter aún corre → completar el texto al instante
     if (!done) {
       clearInterval(intervalRef.current!)
       setDisplayed(current.text)
       setDone(true)
       return
     }
-    // Pasar al siguiente mensaje o cerrar
     if (lineIdx < lines.length - 1) {
       setLineIdx(lineIdx + 1)
     } else {
@@ -84,24 +119,19 @@ export default function Narrator({ lines, onDone }: Props) {
           borderRight: 'none',
           minHeight: '160px',
         }}
-        onClick={advance}
+        onClick={() => { clearTimeout(autoCloseRef.current!); advance() }}
       >
         <div
           className="flex items-center gap-5 px-6 max-w-5xl mx-auto py-10"
           style={{ flexDirection: isRight ? 'row-reverse' : 'row', minHeight: '160px' }}
         >
-          {/* Imagen del narrador */}
+          {/* Imagen / sprite animado del narrador */}
           <div
             className="flex-shrink-0 overflow-hidden"
-            style={{
-              width: '130px',
-              height: '172px',
-              background: 'transparent',
-              position: 'relative',
-            }}
+            style={{ width: '130px', height: '172px', background: 'transparent', position: 'relative' }}
           >
             <Image
-              src={`/characters/Nico/${current.image}`}
+              src={`/characters/Nico/${activeImage}`}
               alt="Narrador"
               fill
               style={{ objectFit: 'contain', objectPosition: 'bottom', imageRendering: 'pixelated' }}
@@ -120,18 +150,15 @@ export default function Narrator({ lines, onDone }: Props) {
               }}
             >
               {displayed}
-              {/* Cursor parpadeante mientras escribe */}
               {!done && (
-                <span
-                  style={{ animation: 'blink 0.6s step-end infinite', color: 'var(--accent)' }}
-                >
+                <span style={{ animation: 'blink 0.6s step-end infinite', color: 'var(--accent)' }}>
                   ▌
                 </span>
               )}
             </p>
 
-            {/* Indicador de avanzar */}
-            {done && (
+            {/* Indicador de avanzar — oculto si hay auto-cierre */}
+            {done && !current.autoCloseMs && (
               <div
                 className="self-end flex items-center gap-1 text-xs"
                 style={{
