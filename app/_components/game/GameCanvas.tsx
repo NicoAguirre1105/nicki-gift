@@ -486,7 +486,7 @@ export default function GameCanvas() {
             const db = Math.abs(DIR_DELTA[best].dx) + Math.abs(DIR_DELTA[best].dy)
             const dc = Math.abs(DIR_DELTA[dir].dx) + Math.abs(DIR_DELTA[dir].dy)
             return dc >= db ? dir : best
-          })
+          }, activeDirs[0])
           facingRef.current = dominantDir
         }
       }

@@ -8,25 +8,17 @@ export type Carta = {
 export const CARTAS: Carta[] = [
   {
     id: 'carta-1',
-    titulo: 'Para mi Nicki en su cumpleaños',
+    titulo: 'Feliz cumpleaños mi Reina!!',
     fecha: 'Junio 2026',
     contenido: `Mi Nicki hermosa,
 
-Hoy es tu cumpleaños y quería escribirte algo que puedas guardar, algo que puedas releer cuando quieras recordar lo especial que eres para mí.
+Esta carta está destinada a agradecerte. ¿Y cómo no? No hay palabras ni cartas suficientes para decir el gusto que siento de tenerte a mi lado.
 
-No sé por dónde empezar porque hay demasiado que decir. Desde el momento en que te conocí en San Petersburgo supe que había algo diferente en ti. No era solo lo bonita que eres (aunque eso también cuenta jeje), era esa energía tuya, esa forma de reírte, esa mirada que lo dice todo sin decir nada.
+Como te he dicho siempre, estar contigo es algo asombroso. Tu forma de ser y tu actitud me contagian la felicidad y me mantienen positivo. Quiero agradecerte por darme la oportunidad de conocerte, de brindarme tu tiempo y tu amor. Tus esfuerzos por ser mejor cada día y tu lucha constante por avanzar me animan a ser mejor para estar a tu altura. Estoy muy orgulloso de la clase de pareja que tengo, de la calidad de persona que eres, y ten por seguro que estaré muy feliz por todo lo que consigas. Gracias por esta bonita relación y por todos los momentos que hemos vivido juntos. Espero poder tenerte cerca pronto y disfrutar aún más de tu presencia. Además, quisiera que este sea uno de tantos años en los que podremos acompañarnos en los cumpleaños. 😁
 
-Han pasado momentos increíbles juntos, y también momentos difíciles. Pero en cada uno de ellos, tú has sido algo constante en mi vida, algo que me alegra. Cada mensaje tuyo me hace sonreír, cada vez que hablamos siento que el mundo tiene más colores.
-
-Eres curiosa, valiente y brillante — todas las anteriores, como ya sabes. Eres la persona que me hace querer ser mejor, que me inspira a seguir adelante, que me recuerda que las cosas bonitas en la vida existen.
-
-Haru tiene suerte de tenerte como dueña. Tú tienes suerte de tenerme a mí jeje... mentira. Soy yo el afortunado.
-
-Ojalá este cumpleaños esté lleno de todo lo que mereces: sushi, bubble tea, BTS en shuffle, y mucho amor. Espero poder dártelo desde lejos hoy, y muy pronto de cerca.
-
-Te quiero muchísimo, mi medialuna.
+Te amo con todo mi corazón y espero que tengas un lindo día. ❤️
 
 Con todo mi amor,
-Nico 💙`,
+Nico`,
   },
 ]
